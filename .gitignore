@@ -1,0 +1,6 @@
+
+.DS_Store
+
+data/*.csv
+data/.Rhistory
+data/quality-of-government-codebook.pdf

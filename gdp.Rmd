@@ -1,0 +1,44 @@
+---
+title: "gdp"
+author: "Parth Aggarwal"
+date: "4/12/2019"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+source("setup.R")
+library(boot)
+
+# Linear Regresssion
+
+```
+
+```{r}
+glm.fit =glm(gdp_percent_change~., data=train_data)
+cv.error= cv.glm(train_data, glm.fit, K=10)$delta[1]
+linear_regression_model = lm(gdp_percent_change ~ ., data = train_data)
+train_predictions = predict.lm(
+  linear_regression_model, train_data)
+test_predictions = predict.lm(
+  linear_regression_model, test_data)
+
+train_error_mse = mean(
+  (train_predictions - train_data$gdp_percent_change)^2)
+test_error_mse = mean(
+  (test_predictions - test_data$gdp_percent_change)^2)
+```
+
+```{r}
+summary(linear_regression_model)
+```
+
+```{r}
+cv.error
+train_error_mse
+test_error_mse
+```
+

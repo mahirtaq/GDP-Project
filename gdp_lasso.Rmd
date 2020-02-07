@@ -1,0 +1,61 @@
+---
+title: "gdp_lasso"
+author: "Mahir Taqbeem"
+date: "April 13, 2019"
+output: html_document
+---
+
+```{r}
+set.seed(420)
+data = read.csv(file="data/quality-of-government-final.csv", header=TRUE, sep=",")
+train_ids = sample(1:nrow(data), size = round(nrow(data)*0.8))
+train_data = data[train_ids, ]
+test_data = data[-train_ids, ]
+```
+
+```{r}
+library(glmnet)
+# Creating matrices for lasso model
+X_train = model.matrix(gdp_percent_change ~ . - cname - X, train_data)
+y_train = train_data$gdp_percent_change
+X_test = model.matrix(gdp_percent_change ~ . - cname - X, test_data)
+y_test = test_data$gdp_percent_change
+```
+
+```{r}
+# choosing best lambda by cv and plotting
+cv.out = cv.glmnet(X_train, y_train, alpha = 1)
+plot(cv.out, main = "CV Error vs Log Lambda")
+```
+
+```{r}
+# Finding best lambda and reporting its cv error
+bestlam = cv.out$lambda.min
+cv_error = min(cv.out$cvm)
+selam = cv.out$lambda.1se
+selam = selam - 1 # subtract 1 since one stderr drops all predictors
+selam
+bestlam
+cv_error
+```
+
+```{r}
+# Fitting model, might have to set grid of lambdas manually
+lasso.mod = glmnet(X_train, y_train, alpha=1)
+lasso.coef = predict(lasso.mod, type="coefficients", s=0.9)
+lasso.coef
+```
+
+```{r}
+plot(lasso.mod, xvar = "lambda", label= TRUE)
+```
+
+```{r}
+lasso.pred_test = predict(lasso.mod, s=bestlam, newx=X_test)
+lasso.pred_train = predict(lasso.mod, s=bestlam, newx=X_train)
+mean((lasso.pred_train - y_train)^2)
+mean((lasso.pred_test - y_test)^2)
+saveRDS(lasso.mod, file = "lasso-model.rds")
+saveRDS(lasso.pred_test, file = "lasso-prediction.rds")
+```
+

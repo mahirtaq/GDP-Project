@@ -1,0 +1,254 @@
+---
+title: "process"
+author: "Parth Aggarwal"
+date: "4/7/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# imports
+source("helper-functions.r")
+
+# Read CSV into R
+
+print("Loading data")
+quality_of_government <- read.csv(file="quality-of-government.csv", header=TRUE, sep=",")
+dim(quality_of_government)
+```
+
+```{r}
+
+# check that data was read correctly
+print(dim(quality_of_government))
+
+
+# These are countries formed after 1970
+countries_to_remove = c("South Sudan",
+                        "Palau",
+                        "Kazakhstan",
+                        "Turkmenistan",
+                        "Tajikistan",
+                        "Kyrgyzstan",
+                        "Moldova",
+                        "Slovenia",
+                        "Belarus",
+                        "Namibia",
+                        "Brunei",
+                        "St Kitts and Nevis",
+                        "Antigua and Barbuda",
+                        "Belize",
+                        "St Vincent and the Grenadines",
+                        "St Lucia",
+                        "Dominica",
+                        "Tuvalu",
+                        "Djibouti",
+                        "Seychelles",
+                        "Suriname",
+                        "Angola",
+                        "Papua New Guinea",
+                        "Sao Tome and Principe",
+                        "Comoros",
+                        "Cape Verde",
+                        "Mozambique",
+                        "Grenada",
+                        "Guinea-Bissau",
+                        "Bahamas",
+                        "Bahrain",
+                        "United Arab Emirates",
+                        "Qatar",
+                        "Bangladesh",
+                        "Fiji"
+                        )
+
+# Removing countries formed after 1970
+quality_of_government = subset(quality_of_government, !(cname %in% countries_to_remove))
+
+lower_year = 1980
+upper_year = 2010
+# Removing data before certain year
+quality_of_government = subset(quality_of_government, year >= lower_year)
+
+print("Dimension of data after removing countries and years")
+
+dim(quality_of_government)
+
+```
+
+```{r}
+#list of surveys to keep
+surveys_to_keep = c(
+  "^cname$",
+  "^year$",
+  "^aid_",
+  "^bci_",
+  "^fao_",
+  "^fi_",
+  "^gea_",
+  "^gle_",
+  "^gol_",
+  "^hf_",
+  "^ictd_",
+  "^icrg_",
+  "^mad_",
+  "^p_",
+  "^ciri_",
+  "^diat_",
+  "^dr_",
+  "^ef_",
+  "^eob_",
+  "^pwt_",
+  "^ross_",
+  "^shec_"
+)
+
+var_names_to_keep = c()
+for (survey_code in surveys_to_keep){
+  indices = grep(survey_code, names(quality_of_government), value=TRUE)
+  var_names_to_keep = append(var_names_to_keep, indices)
+}
+
+quality_of_government = subset(quality_of_government, select=var_names_to_keep)
+
+print("Dimension of dataset after choosing columns")
+dim(quality_of_government)
+
+```
+
+```{r create_gdp_percent_change}
+# Create % change response variable
+
+quality_of_government$gdp_percent_change = calculate_percent_changes(quality_of_government$mad_gdppc, quality_of_government$year)
+
+# Deleting rows which do not have response variable
+missing_gdp_row_id = which(is.na(quality_of_government$gdp_percent_change))
+quality_of_government = quality_of_government[-missing_gdp_row_id,]
+
+```
+
+```{r}
+
+# Remove unneeded gdp predictors and 
+drops = c("gle_cgdpc", "gle_gdp", "gle_rgdpc", "pwt_rgdp", "pwt_slcgdp", "mad_gdppc", "X")
+quality_of_government = quality_of_government[, !(names(quality_of_government) %in% drops)]
+dim(quality_of_government)
+
+#quality_of_government$year = quality_of_government$year-2018
+#write.csv(quality_of_government, file="post_processing.csv")
+```
+
+```{r}
+
+# upper_year = 2010
+# # Removing data after certain year
+# quality_of_government = subset(quality_of_government, year <= upper_year)
+
+nrows = nrow(quality_of_government)
+ncols = ncol(quality_of_government)
+
+# Plotting missing data by rows
+num_na_row = rep(0, nrows)
+for(i in 1:nrows){
+  num_na_row[i] = sum(is.na(quality_of_government[i,]))
+}
+
+percent_na_row = (num_na_row/ncols)*100
+plot(seq(1,nrows),percent_na_row, xlab="rows", ylab="Percent of missing data")
+
+# Plotting missing data by year
+missing_by_year = rep(0, 2018)
+for(i in 1:nrow(quality_of_government)){
+  missing_by_year[quality_of_government[i,]$year] =  missing_by_year[quality_of_government[i,]$year]+(percent_na_row[i])
+}
+
+plot(lower_year:upper_year, missing_by_year[lower_year:upper_year], xlab="Year", ylab="missing" )
+
+
+# countries with more than x% missing data
+# more_countries_to_remove = unique(quality_of_government$cname[which(percent_na_row >90)])
+# quality_of_government = subset(quality_of_government, !(cname %in% more_countries_to_remove))
+# print("Dimension after removing rows with more than 90 percent missing data:")
+# dim(quality_of_government)
+
+
+# Remove rows with more than 95 percent missing data
+quality_of_government = quality_of_government[percent_na_row < 95,]
+
+print("Dimension after removing rows with more than 95% missing data")
+dim(quality_of_government)
+
+```
+
+
+```{r}
+# Plotting missing data by columns
+nrows = nrow(quality_of_government)
+num_na_col = rep(0, ncols)
+for(i in 1:ncols){
+  num_na_col[i] = sum(is.na(quality_of_government[,i]))
+}
+percent_na_col = (num_na_col/nrows)*100
+plot(seq(1,ncols),percent_na_col, xlab="cols", ylab="Percent of missing data")
+
+
+# Plotting percentage of missing data vs number of rows with that much data missing
+zero_to_hundred = seq(1,100)
+rows_included = rep(0,100)
+for(i in 1:100){
+  rows_included[i] = sum(percent_na_row < i)
+}
+
+plot(zero_to_hundred, rows_included, xlab="Percent of Missing Data", ylab="Num rows with less than that much missing data")
+
+
+# Plotting percentage of missing data vs number of columns with that much data missing
+zero_to_hundred = seq(1,100)
+vars_included = rep(0,100)
+for(i in 1:100){
+  vars_included[i] = sum(percent_na_col < i)
+}
+
+plot(zero_to_hundred, vars_included, xlab="Percent of Missing Data", ylab="Num variables with less than that much missing data")
+#which(names(quality_of_government))
+
+
+```
+
+
+
+```{r}
+library('imputeTS')
+country_names = unique(quality_of_government$cname)
+mean_column = rep(1:ncol(quality_of_government))
+
+#mean of the columns
+for( i in 1 : ncol(quality_of_government)){
+  if(is.numeric(quality_of_government[,i]))
+  mean_column[i] <- mean(quality_of_government[,i], na.rm = TRUE)
+}
+
+#interpolation 
+for(country in country_names){
+  country_rows = which(quality_of_government$cname == country)
+  for(i in 1:ncol(quality_of_government)){
+    if(sum(!is.na(quality_of_government[country_rows, i])) >= 2 & is.numeric(quality_of_government[country_rows, i]))
+    quality_of_government[country_rows, i] = na.interpolation(quality_of_government[country_rows, i])
+    else if (!is.numeric(quality_of_government[country_rows, i]))
+            next
+    else
+     quality_of_government[country_rows, i] = mean_column[i] 
+  }
+}
+
+# Removing data after certain year
+quality_of_government = subset(quality_of_government, year <= upper_year)
+```
+
+```{r}
+# save dataset after entire preprocessing is done
+save(quality_of_government, "quality-of-government-final.csv")
+```
+

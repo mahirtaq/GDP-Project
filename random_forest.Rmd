@@ -1,0 +1,49 @@
+---
+title: "random_forest"
+author: "Parth Aggarwal"
+date: "4/13/2019"
+output: html_document
+---
+```{r}
+source("setup.r")
+library(randomForest)
+rf_fit =randomForest(gdp_percent_change~.,data=train_data,importance=TRUE)
+varImpPlot(rf_fit)
+```
+```{r}
+rf_pred_test = predict(rf_fit,newdata=test_data)
+rf_pred_train = predict(rf_fit,newdata=train_data)
+
+rf_err_test = mean((test_data$gdp_percent_change - rf_pred_test)^2)
+rf_err_test
+plot(test_data$gdp_percent_change,rf_pred_test, xlim = c(-10,10), ylim = c(-10,10))
+
+cor(test_data$gdp_percent_change, rf_pred_test)
+
+rf_err_train = mean((train_data$gdp_percent_change - rf_pred_train)^2)
+rf_err_train
+plot(train_data$gdp_percent_change, rf_pred_train, xlim = c(-10,10), ylim = c(-10,10))
+cor(test_data$gdp_percent_change, rf_pred_test)
+
+# Sanity check to see that percent change matches on Google
+# View(data[which(data$gdp_percent_change > 20), 2:3])
+```
+```{r}
+library('e1071')
+tuned_rf = tune(randomForest,
+                gdp_percent_change ~ .,
+                data = train_data, 
+                ranges = list(
+                  mtry = seq(from=5,
+                             to=50,
+                             by=5
+                             ),
+                  ntrees = seq(from=100,
+                               to = 1000,
+                               by = 100)
+                  )
+          )
+
+```
+
+

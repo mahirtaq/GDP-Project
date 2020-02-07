@@ -1,0 +1,163 @@
+```{r}
+
+source("setup.r")
+library(gbm)
+
+```
+
+```{r}
+
+train_data <- subset(train_data, select = -c(cname)) 
+test_data <-subset(test_data, select = -c(cname))
+```
+
+```{r}
+
+boost.train=gbm(gdp_percent_change~.,data=train_data,distribution="gaussian",n.trees=10,interaction.depth=5, cv.folds = 10)
+
+```
+
+```{r}
+#summary(boost.train)
+
+```
+
+
+
+
+
+
+
+```{r}
+plot(boost.train,i="pwt_shhc") 
+plot(boost.train,i="pwt_rt") 
+plot(boost.train,i="hf_govint") 
+```
+```{r}
+yhat.boost=predict(boost.train,newdata=test_data,n.trees=100) 
+testMSE = mean((yhat.boost-test_data$gdp_percent_change)^2)
+testMSE
+```
+
+```{r}
+set.seed(2019)
+#depth_choose = seq(5, 40, by = 5)
+cv.error_tune<-data.frame(0,0,100.7)
+depth_choose = c(5,10,15,20,25,30,35)
+ntree_choose = c(10,50,100,250,500)
+for ( i in 1:length(ntree_choose) ){
+  for (j in 1 : length(depth_choose)){
+      boost.train_temp=gbm(gdp_percent_change~.,data=train_data,distribution="gaussian",n.trees=ntree_choose[i],interaction.depth=depth_choose[j], cv.folds = 10)
+    cv.error_tune[nrow(cv.error_tune)+1,] = list(ntree_choose[i],depth_choose[j], mean(boost.train_temp$cv.error))
+    }
+}
+names(cv.error_tune)<-c("ntrees","depth","cv.error")
+
+```
+
+```{r}
+write.csv(cv.error_tune, file = "cv.error_tune.csv")
+
+
+```
+
+
+```{r}
+library(RColorBrewer)
+```
+
+```{r}
+cv.error_tune = read.csv(file="cv.error_tune.csv", header=TRUE, sep=",")
+cv.error_tune <- subset(cv.error_tune, select = -c(X)) 
+plot(cv.error_tune$cv.error ~ cv.error_tune$ntrees)
+plot(cv.error_tune$cv.error)
+
+
+```
+
+```{r}
+mat.tune <- matrix(1:35, nrow = 5, dimnames = list(c("10","50","100","250","500"), c("5","10","15","20","25","30","35")))
+
+depth_choose = c(5,10,15,20,25,30,35)
+ntree_choose = c(10,50,100,250,500)
+for(i in 1:5){
+  for(j in 1:7)
+    mat.tune[i,j] = cv.error_tune$cv.error[(i-1)*7 + j]
+}
+
+```
+
+```{r}
+cv.error_tune$depth= as.numeric(cv.error_tune$depth)
+cv.error_tune$ntrees=as.numeric(cv.error_tune$ntrees)
+x <- as.matrix(cv.error_tune)
+heatmap(mat.tune,
+        Colv= NA,
+        Rowv = NA,
+       col= brewer.pal(20,"PuBu"),
+        scale = "column",
+        xlab =  "depth",
+        ylab= "n.trees",
+       main ="Cross validation errors vs n.trees vs depth of trees",
+      cexRow = 1.5,
+      cexCol = 1.5,
+      cex.axis = 2
+       
+        ) 
+        
+```
+
+
+
+```{r}
+best_row = which.min(cv.error_tune$cv.error)
+cv.error_tune[best_row,]
+```
+
+```{r}
+ boost.train_best=gbm(gdp_percent_change~.,data=train_data,distribution="gaussian",n.trees=100,interaction.depth=35, cv.folds = 10)
+
+```
+```{r}
+saveRDS(boost.train_best, file = "Boosting_best.rds")
+```
+
+```{r}
+ boost.train_best = readRDS(file = "Boosting_best.rds", refhook = NULL)
+yhat.boost=predict(boost.train_best,newdata=test_data,n.trees=100) 
+testMSE_best = mean((yhat.boost-test_data$gdp_percent_change)^2)
+yhat.boost=predict(boost.train_best,newdata=train_data,n.trees=100) 
+trainMSE_best = mean((yhat.boost-train_data$gdp_percent_change)^2)
+```
+
+```{r}
+trainMSE_best
+testMSE_best
+summary(boost.train_best)
+```
+```{r}
+print(mat.tune)
+```
+
+```{r}
+var.importance<-data.frame("Share of household consumption",4.446 )
+names(var.importance)<-c("Predictors","relative_importance")
+var.importance <- rbind(var.importance,data.frame(Predictors = "Share of residual trade",relative_importance= 4.164))
+
+var.importance <- rbind(var.importance,data.frame(Predictors = "Share of government consumption",relative_importance= 3.537))
+var.importance <- rbind(var.importance,data.frame(Predictors = "Indirect Taxes",relative_importance= 2.977))
+var.importance <- rbind(var.importance,data.frame(Predictors = "Price level of exports",relative_importance= 2.225))
+var.importance <- rbind(var.importance,data.frame(Predictors = "Sum of Commitments recieved from Donors",relative_importance= 2.181))
+var.importance <- rbind(var.importance,data.frame(Predictors = "year",relative_importance= 2.159))
+var.importance <- rbind(var.importance,data.frame(Predictors = "Share of gross capital formation",relative_importance= 2.057))
+var.importance <- rbind(var.importance,data.frame(Predictors = "Forest product footprint",relative_importance= 1.986))
+var.importance <- rbind(var.importance,data.frame(Predictors = "Taxes - total tax revenue",relative_importance= 1.785)) 
+
+``` 
+
+
+
+```{r}
+print(var.importance)
+```
+
